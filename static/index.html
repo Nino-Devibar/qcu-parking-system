@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+  index.html  |  STRUCTURE of the page
+
+  What this file does:
+  It is the single page of the QCU Parking Management System prototype.
+  It only holds the empty containers. Everything you see (login, dashboard,
+  gate monitor, tables, pop-up forms) is drawn into #app by app.js.
+
+  Files:
+    index.html  -> this file: the page skeleton
+    styles.css  -> colors, fonts, layout, light/dark theme
+    app.js      -> data, screens and behavior
+    assets/logo.jpg -> the university seal
+
+  To run: open index.html in a browser. No install or server needed.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QCU Parking Management System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Public+Sans:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- app.js draws the login page or the admin screens in here -->
+  <div id="app"></div>
+  <!-- add / edit / delete pop-up forms appear here -->
+  <div id="modal-root"></div>
+  <!-- small "Vehicle added" style messages appear here -->
+  <div id="toasts" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
