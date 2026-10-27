@@ -6,7 +6,7 @@ Follow the steps **in order**. Do not skip any step. Every command goes in the *
 
 ---
 
-## 0. What you need installed first (one time)
+## 1. What you need installed first (one time)
 
 Install these, then **restart your computer** so Windows can find them.
 
@@ -95,12 +95,13 @@ python app.py
 
 4. **Output** The first time, it downloads the plate-reading model, so it can take a few minutes. When it is ready, the terminal shows `Running on http://127.0.0.1:5000`.
 5. Open your browser (Chrome or Edge) and go to exactly:
-6. 
 ```
 http://127.0.0.1:5000
 ```
 
 6. Sign in
+   Username: admin
+   Password: parking2026
    
 To **stop** the system: click the terminal and press `Ctrl+C`.
 
