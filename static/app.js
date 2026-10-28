@@ -37,7 +37,14 @@ const fmtDate=d=>MONTHS[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear();
 const sameDay=(a,b)=>a.toDateString()===b.toDateString();
 const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
 const dur=(a,b)=>{const m=Math.max(0,Math.round((b-a)/60000)),h=Math.floor(m/60);return h?h+'h '+(m%60)+'m':m+'m'};
-const normPlate=s=>{const t=String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');const m=t.match(/^([A-Z]{3})(\d{3,4})$/);return m?m[1]+' '+m[2]:null};
+
+const normPlate = s => {
+  const t = String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (!/^[A-Z0-9]{3,10}$/.test(t)) return null;
+
+  const m = t.match(/^([A-Z]{3})(\d{3,4})$/);
+  return m ? m[1] + ' ' + m[2] : t;
+};
 
 const ICONS={
  dashboard:'<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
@@ -474,7 +481,7 @@ function modalHTML(m){
     const v=m.v,e=m.err||{};const u=state.users.find(x=>x.id===v.userId);
     return `<header><h2 id="mt">${m.edit?'Edit vehicle':'Add vehicle'}</h2><button class="iconbtn" data-act="close-modal" aria-label="Close">${ic('x')}</button></header>
     <form id="mform" novalidate>
-     <div class="field"><label for="f-plate">Plate number *</label><input class="input mono${e.plate?' err':''}" id="f-plate" placeholder="e.g. ABC 1234" value="${esc(v.plate)}" autocomplete="off"${m.edit?' readonly':''}>${e.plate?`<span class="ferr">${e.plate}</span>`:`<span class="hint">3 letters followed by 3 or 4 digits.</span>`}</div>
+     <div class="field"><label for="f-plate">Plate number *</label><input class="input mono${e.plate?' err':''}" id="f-plate" placeholder="e.g. ABC 1234" value="${esc(v.plate)}" autocomplete="off"${m.edit?' readonly':''}>${e.plate?`<span class="ferr">${e.plate}</span>`:`<span class="hint">3 letters followed by 3 or 4 digits in any order.</span>`}</div>
      <div class="field"><label for="f-owner">Owner *</label><select class="select${e.owner?' err':''}" id="f-owner"><option value="">Select owner</option>${state.users.map(x=>`<option value="${esc(x.id)}"${x.id===v.userId?' selected':''}>${esc(x.name)} (${esc(x.id)})</option>`).join('')}</select>${e.owner?`<span class="ferr">${e.owner}</span>`:`<span class="hint">Owner isn't listed? <button type="button" class="linkbtn" style="font-size:12px" data-act="add-user-from-vehicle">Add a user first</button></span>`}</div>
      <div class="field"><label>Type</label><div class="readonly" id="f-type">${u?u.role:'Set from the owner'}</div></div>
      <div class="field"><label for="f-status">Status</label><select class="select" id="f-status"><option${v.status==='Active'?' selected':''}>Active</option><option${v.status==='Inactive'?' selected':''}>Inactive</option></select></div>
@@ -509,7 +516,7 @@ function saveVehicle(){
   const m=state.modal,v={plate:$('#f-plate').value,userId:$('#f-owner').value,status:$('#f-status').value};const err={};
   const p=normPlate(v.plate);
   if(!v.plate.trim())err.plate='Enter the plate number.';
-  else if(!p)err.plate='Use 3 letters and 3 or 4 digits, like NAB 1234.';
+  else if(!p)err.plate='Enter a valid plate using 3 letters and 3 to 4 numbers.';
   else if(!m.edit&&state.vehicles.some(x=>x.plate===p))err.plate='This plate is already registered.';
   if(!v.userId)err.owner='Choose the vehicle owner.';
   if(Object.keys(err).length){m.v={...v};m.err=err;renderModal();return}
