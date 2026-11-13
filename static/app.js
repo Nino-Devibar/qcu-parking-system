@@ -244,7 +244,8 @@ function vehicleTable(){
   const q=state.vq.trim().toLowerCase();
   const list=state.vehicles.filter(v=>{const o=ownerOf(v.plate);return (state.vtype==='all'||o.type===state.vtype)&&(!q||v.plate.toLowerCase().includes(q)||o.owner.toLowerCase().includes(q)||o.type.toLowerCase().includes(q))});
   if(!list.length)return `<div class="empty"><b>No vehicles match</b><span>${state.vehicles.length?'Try a different plate number, owner or type.':'Register the first vehicle to start recognizing plates.'}</span>${state.vehicles.length?`<button class="btn sm" data-act="clear-v">Clear search</button>`:`<button class="btn primary" data-act="add-vehicle">${ic('plus')}Add vehicle</button>`}</div>`;
-  return `<div class="tablewrap"><table><thead><tr><th>Plate number</th><th>Owner name</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody>${list.map(v=>{const o=ownerOf(v.plate);return `<tr><td>${plate(v.plate)}</td><td>${esc(o.owner)}</td><td>${esc(o.type)}</td><td><span class="pill ${v.status==='Active'?'good':''}">${v.status}</span></td><td><div class="acts"><button class="btn sm" data-act="edit-vehicle" data-id="${esc(v.plate)}" aria-label="Edit ${esc(v.plate)}">${ic('edit',15)}Edit</button><button class="btn sm danger" data-act="del-vehicle" data-id="${esc(v.plate)}" aria-label="Delete ${esc(v.plate)}">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
+  return `<div class="tablewrap"><table><thead><tr><th>Plate number</th><th>Owner name</th><th>Owner role</th><th>Vehicle category</th><th>Status</th><th>Actions</th></tr></thead><tbody>${list.map(v=>{const o=ownerOf(v.plate);return `<tr><td>${plate(v.plate)}</td><td>${esc(o.owner)}</td><td>${esc(o.type)}</td>
+<td>${esc(v.vehicleType==='FourWheeler'?'Four-wheeler and above':v.vehicleType||'Unclassified')}</td><td><span class="pill ${v.status==='Active'?'good':''}">${v.status}</span></td><td><div class="acts"><button class="btn sm" data-act="edit-vehicle" data-id="${esc(v.plate)}" aria-label="Edit ${esc(v.plate)}">${ic('edit',15)}Edit</button><button class="btn sm danger" data-act="del-vehicle" data-id="${esc(v.plate)}" aria-label="Delete ${esc(v.plate)}">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
 }
 function vVehicles(){
   return `<div class="phead"><div><h1>Vehicle registration</h1><p>Only vehicles listed here are let in automatically.</p></div><div class="right"><button class="btn primary" data-act="add-vehicle">${ic('plus')}Add vehicle</button></div></div>
@@ -483,7 +484,20 @@ function modalHTML(m){
     <form id="mform" novalidate>
      <div class="field"><label for="f-plate">Plate number *</label><input class="input mono${e.plate?' err':''}" id="f-plate" placeholder="e.g. ABC 1234" value="${esc(v.plate)}" autocomplete="off"${m.edit?' readonly':''}>${e.plate?`<span class="ferr">${e.plate}</span>`:`<span class="hint">3 letters followed by 3 or 4 digits in any order.</span>`}</div>
      <div class="field"><label for="f-owner">Owner *</label><select class="select${e.owner?' err':''}" id="f-owner"><option value="">Select owner</option>${state.users.map(x=>`<option value="${esc(x.id)}"${x.id===v.userId?' selected':''}>${esc(x.name)} (${esc(x.id)})</option>`).join('')}</select>${e.owner?`<span class="ferr">${e.owner}</span>`:`<span class="hint">Owner isn't listed? <button type="button" class="linkbtn" style="font-size:12px" data-act="add-user-from-vehicle">Add a user first</button></span>`}</div>
-     <div class="field"><label>Type</label><div class="readonly" id="f-type">${u?u.role:'Set from the owner'}</div></div>
+     <div class="field">
+  <label for="f-vehicle-type">Vehicle Category *</label>
+  <select class="select${e.vehicleType?' err':''}" id="f-vehicle-type">
+    <option value="">Select vehicle category</option>
+    <option value="Motorcycle"${v.vehicleType==='Motorcycle'?' selected':''}>Motorcycle</option>
+    <option value="FourWheeler"${v.vehicleType==='FourWheeler'?' selected':''}>Four-wheeler and above</option>
+  </select>
+  ${e.vehicleType?`<span class="ferr">${e.vehicleType}</span>`:''}
+</div>
+
+<div class="field">
+  <label>Owner role</label>
+  <div class="readonly" id="f-type">${u?u.role:'Set from the owner'}</div>
+</div>
      <div class="field"><label for="f-status">Status</label><select class="select" id="f-status"><option${v.status==='Active'?' selected':''}>Active</option><option${v.status==='Inactive'?' selected':''}>Inactive</option></select></div>
      <div class="foot"><button type="button" class="btn" data-act="close-modal">Cancel</button><button class="btn primary" type="submit">Save vehicle</button></div></form>`;
   }
@@ -513,15 +527,35 @@ const openModal=m=>{state.modal=m;renderModal()};
 const closeModal=()=>{state.modal=null;renderModal()};
 
 function saveVehicle(){
-  const m=state.modal,v={plate:$('#f-plate').value,userId:$('#f-owner').value,status:$('#f-status').value};const err={};
+  const m=state.modal,v={
+  plate:$('#f-plate').value,
+  userId:$('#f-owner').value,
+  status:$('#f-status').value,
+  vehicleType:$('#f-vehicle-type').value
+};
+const err={};
   const p=normPlate(v.plate);
   if(!v.plate.trim())err.plate='Enter the plate number.';
   else if(!p)err.plate='Enter a valid plate using 3 letters and 3 to 4 numbers.';
   else if(!m.edit&&state.vehicles.some(x=>x.plate===p))err.plate='This plate is already registered.';
   if(!v.userId)err.owner='Choose the vehicle owner.';
+  if(!v.vehicleType)err.vehicleType='Choose the vehicle category.';
   if(Object.keys(err).length){m.v={...v};m.err=err;renderModal();return}
-  if(m.edit){const t=state.vehicles.find(x=>x.plate===m.v.plate);t.userId=v.userId;t.status=v.status;toast('Vehicle updated')}
-  else{state.vehicles.push({plate:p,userId:v.userId,status:v.status});toast('Vehicle added')}
+  if(m.edit){
+  const t=state.vehicles.find(x=>x.plate===m.v.plate);
+  t.userId=v.userId;
+  t.status=v.status;
+  t.vehicleType=v.vehicleType;
+  toast('Vehicle updated');
+}else{
+  state.vehicles.push({
+    plate:p,
+    userId:v.userId,
+    status:v.status,
+    vehicleType:v.vehicleType
+  });
+  toast('Vehicle added');
+}
   closeModal();render();
 }
 function saveUser(){
@@ -562,11 +596,34 @@ document.addEventListener('click',e=>{
   else if(a==='forgot'){state.forgot=true;state.loginErr='';const u=$('#u').value,p=$('#p').value;render();$('#u').value=u;$('#p').value=p}
   else if(a==='goto-flagged'){state.rf={from:'',to:'',type:'all',status:'flagged',q:'',page:1};go('records')}
   /* vehicles */
-  else if(a==='add-vehicle')openModal({type:'vehicle',v:{plate:'',userId:'',status:'Active'},edit:false});
+  else if(a==='add-vehicle')openModal({
+  type:'vehicle',
+  v:{
+    plate:'',
+    userId:'',
+    status:'Active',
+    vehicleType:''
+  },
+  edit:false
+});
   else if(a==='edit-vehicle'){const v=state.vehicles.find(x=>x.plate===t.dataset.id);openModal({type:'vehicle',v:{...v},edit:true})}
   else if(a==='del-vehicle'){openModal({type:'confirm',kind:'vehicle',id:t.dataset.id,title:'Delete this vehicle?',text:`${t.dataset.id} will no longer be recognized at the gate. Past parking records stay.`,cta:'Delete vehicle'})}
   else if(a==='clear-v'){state.vq='';state.vtype='all';render()}
-  else if(a==='add-user-from-vehicle'){const vv={plate:$('#f-plate').value,userId:'',status:$('#f-status').value};openModal({type:'user',u:{id:'',name:'',role:'Student',status:'Active'},edit:false,returnToVehicle:vv})}
+  else if(a==='add-user-from-vehicle'){
+  const vv={
+    plate:$('#f-plate').value,
+    userId:'',
+    status:$('#f-status').value,
+    vehicleType:$('#f-vehicle-type').value
+  };
+
+  openModal({
+    type:'user',
+    u:{id:'',name:'',role:'Student',status:'Active'},
+    edit:false,
+    returnToVehicle:vv
+  });
+}
   /* users */
   else if(a==='add-user')openModal({type:'user',u:{id:'',name:'',role:'Student',status:'Active'},edit:false});
   else if(a==='edit-user'){const u=state.users.find(x=>x.id===t.dataset.id);openModal({type:'user',u:{...u},edit:true})}
