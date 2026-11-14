@@ -554,8 +554,8 @@ function showParkingFullWarning(vehicleType){
 
 function isParkingFull(vehicleType){
   const capacity = {
-    Motorcycle: 3,
-    FourWheeler: 1
+    Motorcycle: 50,
+    FourWheeler: 20
   };
 
   const occupied = state.records.filter(r =>
