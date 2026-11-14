@@ -287,3 +287,129 @@ input[type=range]{accent-color:var(--accent);width:200px}
 #camwrap video{width:100%;height:100%;object-fit:cover;display:block}
 #camwrap .detbox{position:absolute;display:none;border:3px solid #3ddc84;border-radius:4px}
 #camwrap .dettag{position:absolute;display:none;background:rgba(13,18,24,.88);color:#e9eef6;font:600 12px "IBM Plex Mono",monospace;padding:3px 7px;border-radius:3px;white-space:nowrap}
+
+
+/* PARKING AVAILABILITY */
+.parking-availability {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.parking-category {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px;
+    background: #f5f7fa;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    min-height: 70px;
+}
+
+.parking-category span {
+    font-size: 15px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.parking-category strong {
+    font-size: 24px;
+    font-weight: 700;
+    color: #2563eb;
+}
+
+
+/* PARKING FULL WARNING POPUP */
+
+.parking-warning-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(0, 0, 0, 0.78);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+.parking-warning-box {
+    width: 100%;
+    max-width: 520px;
+    background: #ffffff;
+    border: 4px solid #dc2626;
+    border-radius: 18px;
+    padding: 35px;
+    text-align: center;
+    box-shadow: 0 15px 60px rgba(0, 0, 0, 0.45);
+    animation: parkingWarningPop 0.25s ease-out;
+}
+
+.parking-warning-icon {
+    font-size: 65px;
+    margin-bottom: 12px;
+}
+
+.parking-warning-label {
+    color: #dc2626;
+    font-size: 14px;
+    font-weight: 900;
+    letter-spacing: 3px;
+    margin-bottom: 12px;
+}
+
+.parking-warning-box h1 {
+    color: #b91c1c;
+    font-size: 27px;
+    font-weight: 900;
+    line-height: 1.2;
+    margin: 0 0 18px;
+}
+
+.parking-warning-box p {
+    color: #374151;
+    font-size: 17px;
+    line-height: 1.5;
+    margin-bottom: 22px;
+}
+
+.parking-warning-note {
+    background: #fee2e2;
+    border: 1px solid #fecaca;
+    border-radius: 10px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    color: #991b1b;
+    margin-bottom: 24px;
+    font-size: 14px;
+}
+
+.parking-warning-box button {
+    width: 100%;
+    padding: 16px;
+    border: none;
+    border-radius: 9px;
+    background: #dc2626;
+    color: white;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.parking-warning-box button:hover {
+    background: #991b1b;
+}
+
+@keyframes parkingWarningPop {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
