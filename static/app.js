@@ -474,7 +474,7 @@ function vGate(){
   const recent=activityRows(5).map(e=>`<div class="r">${plate(e.r.plate)}<span>${e.a}</span><span class="tm">${fmtTime(e.t)}</span></div>`).join('');
   return `<div class="phead"><div><h1>Gate monitor</h1><p>Live plate recognition for the main gate.</p></div>
    <div class="right"><div class="seg" role="group" aria-label="Lane direction"><button data-act="dir" data-d="entry" aria-pressed="${entry}">${ic('entry',16)}Entry</button><button data-act="dir" data-d="exit" aria-pressed="${!entry}">${ic('exit',16)}Exit</button></div>
-   <span class="pill ${g.open?'warn':'good'}" data-gatebadge style="min-height:38px;padding:0 14px">${ic('barrier',16)}Gate: ${g.open?'open':'closed'}</span></div></div>
+   <span class="pill ${g.open?'warn':'good'}" data-gatebadge style="min-height:38px;padding:0 14px">${ic('barrier',16)}Gate: ${g.open?'open':'closed'}</span><button class="btn${light.connected?' good':''}" data-act="connect-light" style="min-height:38px">${light.connected?'Light connected':'Connect light'}</button></div></div>
   <div class="gate">
    <section class="card"><div class="cam">${camSVG(g)}<div class="ov top"><span class="live"><i></i>LIVE · Main gate, lane 1</span><span data-clock>${fmtTime(new Date())}</span></div><div class="ov bot"><span>${entry?'ENTRY LANE':'EXIT LANE'}</span><span>Confidence ${g.conf?g.conf+'%':'—'}</span></div></div>
     <div class="plateread"><span class="plate lg">${esc(showPlate)}</span>
@@ -581,10 +581,29 @@ function recordAuthorized(v){
 
   logEvent(v.plate,'Registered vehicle',g.dir);
 }
+/* ===== indicator light (ESP32 over USB, Chrome or Edge): green = registered, red = not registered ===== */
+const light={port:null,writer:null,connected:false};
+async function connectLight(){
+  if(!('serial' in navigator)){toast('Use Chrome or Edge to connect the light.');return}
+  try{
+    light.port=await navigator.serial.requestPort();
+    await light.port.open({baudRate:115200});
+    light.writer=light.port.writable.getWriter();
+    light.connected=true;toast('Indicator light connected');render();
+  }catch(e){toast('Light not connected. Close the Arduino Serial Monitor and try again.')}
+}
+async function setLight(c){
+  if(!c||!light.connected||!light.writer)return;
+  try{await light.writer.write(new TextEncoder().encode(c))}
+  catch(e){light.connected=false;light.writer=null;toast('Indicator light disconnected');render()}
+}
 function evaluate(plateStr,conf){
+  
   const g=G(),s=state.settings;g.plate=plateStr;g.conf=conf;g.reason='';g.logged=false;g.open=g.open&&false;
   const v=state.vehicles.find(x=>x.plate===plateStr);g.veh=v||null;
   const inside=isInside(plateStr);
+    if(!v||v.status!=='Active')setLight('R');
+  else if(!((g.dir==='entry'&&inside)||(g.dir==='exit'&&!inside)))setLight('G');
   if(!v){g.phase='blocked';g.reason='Plate is not registered';}
   else if(v.status!=='Active'){g.phase='blocked';g.reason='Registration is inactive';}
   else if(g.dir==='entry'&&inside){g.phase='duplicate';g.reason='In since '+fmtTime(inside.entry)+'. Check for a duplicate read.';}
@@ -859,6 +878,7 @@ else if(a==='gate-open'){
   else if(a==='gate-visitor')logManual('visitor');
   else if(a==='gate-deny')logManual('deny');
   else if(a==='gate-dismiss')resetGate();
+  else if(a==='connect-light')connectLight();
   else if(a==='gate-rescan'){const k=G().kind;resetGate();if(k==='live')cam.cool={};else simulate(k==='unclear'?'registered':k)}
   else if(a==='gate-recheck'){const g=G(),p=normPlate(g.manualVal);if(!p){g.manualErr='Use 3 letters and 3 or 4 digits, like NAB 1234.';render();const i=$('#manualplate');i&&(i.focus(),i.setSelectionRange(99,99))}else{g.manualErr='';evaluate(p,100)}}
   /* settings */
