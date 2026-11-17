@@ -116,7 +116,22 @@ const state={
   gate:{dir:'entry',phase:'idle',plate:'',conf:0,kind:'',veh:null,reason:'',open:false,openMode:'',event:null,guess:''},
 };
 let rid=1;
-const ownerOf=p=>{const v=state.vehicles.find(x=>x.plate===p);const u=v&&state.users.find(x=>x.id===v.userId);return u?{owner:u.name,type:u.role}:{owner:'Unregistered',type:'Visitor'}};
+const ownerOf=p=>{
+  const v=state.vehicles.find(x=>x.plate===p);
+  const u=v&&state.users.find(x=>x.id===v.userId);
+
+  return u
+    ? {
+        owner:u.name,
+        type:u.role,
+        vehicleType:v.vehicleType || 'Unclassified'
+      }
+    : {
+        owner:'Unregistered',
+        type:'Visitor',
+        vehicleType:'Unclassified'
+      };
+};
 function addRec(plate,entry,exit,result='ok',extra={}){const o=ownerOf(plate);const r={id:rid++,plate,owner:o.owner,type:o.type,entry,exit,result,note:'',reviewed:result==='ok',...extra};state.records.push(r);return r}
 
 
@@ -210,6 +225,19 @@ function vDashboard(){
   const exits=state.records.filter(r=>r.exit&&sameDay(r.exit,now)).length;
   const fl=flagged().length;
   const inside=state.records.filter(r=>r.entry&&!r.exit&&r.result!=='denied').length;
+  const motorcycles=state.records.filter(r=>
+  r.entry &&
+  !r.exit &&
+  r.result!=='denied' &&
+  r.vehicleType==='Motorcycle'
+).length;
+
+const fourWheelers=state.records.filter(r=>
+  r.entry &&
+  !r.exit &&
+  r.result!=='denied' &&
+  r.vehicleType==='FourWheeler'
+).length;
   const hrs=Array.from({length:13},(_,i)=>6+i);
   const counts=hrs.map(h=>state.records.filter(r=>r.entry&&r.result!=='denied'&&sameDay(r.entry,now)&&r.entry.getHours()===h).length);
   const max=Math.max(1,...counts);
@@ -231,11 +259,35 @@ function vDashboard(){
       <div class="bars" role="img" aria-label="Entries per hour from 6 AM to 6 PM. Busiest hour has ${max} entries.">${counts.map((c,i)=>`<div class="col"><div class="bar${c?'':' zero'}" style="height:${c?Math.max(6,c/max*100):2}%" title="${lab(hrs[i])}: ${c} entr${c===1?'y':'ies'}"></div></div>`).join('')}</div>
       <div class="barlbl">${hrs.map((h,i)=>`<span>${i%2===0?lab(h):''}</span>`).join('')}</div></div></section>
    </div>
-   <section class="card"><header><h2>System status</h2></header><div class="body"><div class="status">
-     <div class="row">${ic('camera')}<span class="t">Camera</span><span class="s pill good"><span class="dot"></span>Online</span></div>
-     <div class="row">${ic('barrier')}<span class="t">Gate</span><span class="s pill good" data-gatebadge><span class="dot"></span>Online, ${state.gate.open?'open':'closed'}</span></div>
-     <div class="row">${ic('db')}<span class="t">Database</span><span class="s pill good"><span class="dot"></span>Online</span></div>
-   </div></div></section>
+   
+   <div class="stack">
+    <!-- EXISTING SYSTEM STATUS -->
+    <section class="card">
+     <header><h2>System status</h2></header>
+     <div class="body">
+      <div class="status">
+       <div class="row">${ic('camera')}<span class="t">Camera</span><span class="s pill good"><span class="dot"></span>Online</span></div>
+       <div class="row">${ic('barrier')}<span class="t">Gate</span><span class="s pill good" data-gatebadge><span class="dot"></span>Online, ${state.gate.open?'open':'closed'}</span></div>
+       <div class="row">${ic('db')}<span class="t">Database</span><span class="s pill good"><span class="dot"></span>Online</span></div>
+      </div>
+     </div>
+    </section>
+
+    <!-- NEW PARKING AVAILABILITY -->
+    <section class="card">
+     <header><h2>Parking availability</h2></header>
+     <div class="body">
+      <div class="parking-availability">
+       <div class="parking-category">
+        <span>🏍️ Motorcycles</span>
+        <strong>${motorcycles} / 50</strong>       </div>
+       <div class="parking-category">
+        <span>🚗 Four-wheelers and above</span>
+        <strong>${fourWheelers} / 20</strong>       </div>
+      </div>
+     </div>
+    </section>
+   </div>
   </div>`;
 }
 
@@ -244,7 +296,8 @@ function vehicleTable(){
   const q=state.vq.trim().toLowerCase();
   const list=state.vehicles.filter(v=>{const o=ownerOf(v.plate);return (state.vtype==='all'||o.type===state.vtype)&&(!q||v.plate.toLowerCase().includes(q)||o.owner.toLowerCase().includes(q)||o.type.toLowerCase().includes(q))});
   if(!list.length)return `<div class="empty"><b>No vehicles match</b><span>${state.vehicles.length?'Try a different plate number, owner or type.':'Register the first vehicle to start recognizing plates.'}</span>${state.vehicles.length?`<button class="btn sm" data-act="clear-v">Clear search</button>`:`<button class="btn primary" data-act="add-vehicle">${ic('plus')}Add vehicle</button>`}</div>`;
-  return `<div class="tablewrap"><table><thead><tr><th>Plate number</th><th>Owner name</th><th>Type</th><th>Status</th><th>Actions</th></tr></thead><tbody>${list.map(v=>{const o=ownerOf(v.plate);return `<tr><td>${plate(v.plate)}</td><td>${esc(o.owner)}</td><td>${esc(o.type)}</td><td><span class="pill ${v.status==='Active'?'good':''}">${v.status}</span></td><td><div class="acts"><button class="btn sm" data-act="edit-vehicle" data-id="${esc(v.plate)}" aria-label="Edit ${esc(v.plate)}">${ic('edit',15)}Edit</button><button class="btn sm danger" data-act="del-vehicle" data-id="${esc(v.plate)}" aria-label="Delete ${esc(v.plate)}">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
+  return `<div class="tablewrap"><table><thead><tr><th>Plate number</th><th>Owner name</th><th>Owner role</th><th>Vehicle category</th><th>Status</th><th>Actions</th></tr></thead><tbody>${list.map(v=>{const o=ownerOf(v.plate);return `<tr><td>${plate(v.plate)}</td><td>${esc(o.owner)}</td><td>${esc(o.type)}</td>
+<td>${esc(v.vehicleType==='FourWheeler'?'Four-wheeler and above':v.vehicleType||'Unclassified')}</td><td><span class="pill ${v.status==='Active'?'good':''}">${v.status}</span></td><td><div class="acts"><button class="btn sm" data-act="edit-vehicle" data-id="${esc(v.plate)}" aria-label="Edit ${esc(v.plate)}">${ic('edit',15)}Edit</button><button class="btn sm danger" data-act="del-vehicle" data-id="${esc(v.plate)}" aria-label="Delete ${esc(v.plate)}">Delete</button></div></td></tr>`}).join('')}</tbody></table></div>`;
 }
 function vVehicles(){
   return `<div class="phead"><div><h1>Vehicle registration</h1><p>Only vehicles listed here are let in automatically.</p></div><div class="right"><button class="btn primary" data-act="add-vehicle">${ic('plus')}Add vehicle</button></div></div>
@@ -380,9 +433,34 @@ function vGate(){
     if(g.open||g.logged)action=`<div class="notice" role="status">${ic('check')}<span>${g.openMode==='auto'?'Gate opened automatically.':'Gate opened by guard.'} It closes in ${s.autoClose} seconds.</span></div>`;
     else action=`<button class="btn good block" style="min-height:48px;font-size:15px" data-act="gate-open">${ic('barrier')}Open gate and record ${entry?'entry':'exit'}</button>`;
   }else if(ph==='blocked'){
-    action=`<div class="field"><label for="reason">Reason for letting in</label><select class="select" id="reason" data-bind="reasonSel"><option>Visitor</option><option>Delivery</option><option>Official guest</option><option>Emergency</option></select></div>
-    <button class="btn primary block" data-act="gate-visitor">${ic('barrier')}${entry?'Let in as visitor':'Let out'}</button>
-    <button class="btn danger block" data-act="gate-deny">${ic('x')}${entry?'Deny entry':'Deny exit'}</button>`;
+    action=`
+    <div class="field">
+      <label for="reason">Reason for letting in</label>
+      <select class="select" id="reason" data-bind="reasonSel">
+        <option>Visitor</option>
+        <option>Delivery</option>
+        <option>Official guest</option>
+        <option>Emergency</option>
+      </select>
+    </div>
+
+    ${entry?`
+    <div class="field">
+      <label for="visitorVehicleType">Vehicle category</label>
+      <select class="select" id="visitorVehicleType">
+        <option value="Motorcycle">Motorcycle</option>
+        <option value="FourWheeler">Four-wheelers and above</option>
+      </select>
+    </div>
+    `:''}
+
+    <button class="btn primary block" data-act="gate-visitor">
+      ${ic('barrier')}${entry?'Let in as visitor':'Let out'}
+    </button>
+
+    <button class="btn danger block" data-act="gate-deny">
+      ${ic('x')}${entry?'Deny entry':'Deny exit'}
+    </button>`;
   }else if(ph==='unclear'){
     action=`<div class="field"><label for="manualplate">Plate number</label><input class="input mono" id="manualplate" data-bind="manual" placeholder="e.g. NAB 1234" value="${esc(g.manualVal||'')}" autocomplete="off">${g.manualErr?`<span class="ferr">${esc(g.manualErr)}</span>`:`<span class="hint">Type what you can read on the plate.</span>`}</div>
     <button class="btn primary block" data-act="gate-recheck">Check plate</button><button class="btn block" data-act="gate-rescan">Scan again</button>`;
@@ -402,7 +480,11 @@ function vGate(){
     <div class="plateread"><span class="plate lg">${esc(showPlate)}</span>
      <div class="banner ${banner[0]}" role="status">${ic(banner[1])}<div><b>${banner[2]}</b><span>${esc(banner[3])}</span></div></div></div></section>
    <section class="card"><div class="sect"><h3>Vehicle information</h3>
-     ${g.veh&&ph!=='idle'&&ph!=='scanning'?`<dl class="kv"><dt>Owner</dt><dd>${esc(o.owner)}</dd><dt>Type</dt><dd>${esc(o.type)}</dd><dt>Plate</dt><dd class="mono">${esc(g.veh.plate)}</dd><dt>Registration</dt><dd>${g.veh.status}</dd></dl>`:
+     ${g.veh&&ph!=='idle'&&ph!=='scanning'?`<dl class="kv"><dt>Owner</dt><dd>${esc(o.owner)}</dd>
+<dt>Type</dt><dd>${esc(o.type)}</dd>
+<dt>Vehicle category</dt><dd>${esc(g.veh.vehicleType || o.vehicleType || 'Unclassified')}</dd>
+<dt>Plate</dt><dd class="mono">${esc(g.veh.plate)}</dd>
+<dt>Registration</dt><dd>${g.veh.status}</dd></dl>`:
      `<p style="color:var(--muted)">${ph==='blocked'&&!g.veh?'This plate is not in the registered vehicles list.':ph==='unclear'?'Waiting for a confirmed plate number.':'Details appear when a vehicle is recognized.'}</p>`}</div>
     <div class="sect"><h3>Action</h3>${action}</div>
     <div class="sect"><h3>Log entry</h3><dl class="kv"><dt>Time</dt><dd class="num">${ev?fmtTime(ev.t):'—'}</dd><dt>Date</dt><dd>${ev?fmtDate(ev.t):'—'}</dd><dt>Direction</dt><dd>${ev?(ev.dir==='entry'?'Entry':'Exit'):'—'}</dd><dt>Recorded as</dt><dd>${ev?ev.as:'—'}</dd></dl></div></section>
@@ -424,9 +506,79 @@ function openGate(mode){
   gateTimer=setTimeout(()=>{g.open=false;if(state.page==='gate'&&state.auth){if(g.phase==='authorized'){g.phase='idle';g.plate='';g.veh=null;g.conf=0}render()}},state.settings.autoClose*1000);
 }
 function logEvent(plateStr,as,dir){G().event={t:new Date(),dir,as}}
+
+function showParkingFullWarning(vehicleType){
+  const isMotorcycle = vehicleType === 'Motorcycle';
+
+  const title = isMotorcycle
+    ? 'MOTORCYCLE PARKING IS FULL!'
+    : 'FOUR-WHEELER PARKING IS FULL!';
+
+  const message = isMotorcycle
+    ? 'All 50 motorcycle parking spaces are currently occupied.'
+    : 'All 20 four-wheeler parking spaces are currently occupied.';
+
+  const oldWarning = document.getElementById('parkingFullWarning');
+  if(oldWarning) oldWarning.remove();
+
+  const warning = document.createElement('div');
+  warning.id = 'parkingFullWarning';
+  warning.className = 'parking-warning-overlay';
+
+  warning.innerHTML = `
+    <div class="parking-warning-box">
+      <div class="parking-warning-icon">⚠️</div>
+
+      <div class="parking-warning-label">PARKING FULL</div>
+
+      <h1>${title}</h1>
+
+      <p>${message}</p>
+
+      <div class="parking-warning-note">
+        <strong>Please do not allow entry.</strong>
+        <span>Proceed to the admin office for assistance.</span>
+      </div>
+
+      <button id="closeParkingWarning">
+        OK, UNDERSTOOD
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(warning);
+
+  document.getElementById('closeParkingWarning')
+    .addEventListener('click', () => warning.remove());
+}
+
+function isParkingFull(vehicleType){
+  const capacity = {
+    Motorcycle: 50,
+    FourWheeler: 20
+  };
+
+  const occupied = state.records.filter(r =>
+    r.entry &&
+    !r.exit &&
+    r.result !== 'denied' &&
+    r.vehicleType === vehicleType
+  ).length;
+
+  return occupied >= capacity[vehicleType];
+}
 function recordAuthorized(v){
   const g=G(),now=new Date();
-  if(g.dir==='entry'){addRec(v.plate,now,null)}else{const r=isInside(v.plate);if(r)r.exit=now}
+
+  if(g.dir==='entry'){
+    addRec(v.plate,now,null,'ok',{
+      vehicleType:v.vehicleType
+    });
+  }else{
+    const r=isInside(v.plate);
+    if(r)r.exit=now;
+  }
+
   logEvent(v.plate,'Registered vehicle',g.dir);
 }
 function evaluate(plateStr,conf){
@@ -437,7 +589,21 @@ function evaluate(plateStr,conf){
   else if(v.status!=='Active'){g.phase='blocked';g.reason='Registration is inactive';}
   else if(g.dir==='entry'&&inside){g.phase='duplicate';g.reason='In since '+fmtTime(inside.entry)+'. Check for a duplicate read.';}
   else if(g.dir==='exit'&&!inside){g.phase='duplicate';g.reason='This vehicle was never logged coming in.';}
-  else{g.phase='authorized';if(s.autoOpen){recordAuthorized(v);g.logged=true;openGate('auto')}}
+else{
+  g.phase='authorized';
+
+  if(s.autoOpen){
+    const vehicleType = v.vehicleType || ownerOf(v.plate).vehicleType;
+
+    if(g.dir==='entry' && isParkingFull(vehicleType)){
+      showParkingFullWarning(vehicleType);
+    }else{
+      recordAuthorized(v);
+      g.logged=true;
+      openGate('auto');
+    }
+  }
+}
   render();
 }
 function simulate(kind){
@@ -463,16 +629,46 @@ function simulate(kind){
 function logManual(kind){
   const g=G(),now=new Date(),entry=g.dir==='entry';
   const reason=($('#reason')||{}).value||'Visitor';
+
   if(kind==='visitor'){
-    if(entry)addRec(g.plate,now,null,'manual',{note:reason,reviewed:false});
-    else{const r=isInside(g.plate);if(r)r.exit=now;else addRec(g.plate,null,now,'manual',{note:reason,reviewed:false})}
-    g.phase='visitor';logEvent(g.plate,'Manual: '+reason,g.dir);openGate('manual');
-  }else{
-    addRec(g.plate,now,null,'denied',{note:'Denied by guard',reviewed:false});
-    g.phase='denied';logEvent(g.plate,'Denied',g.dir);
+    if(entry){
+  const vehicleType=($('#visitorVehicleType')||{}).value||'Unclassified';
+
+  if(isParkingFull(vehicleType)){
+    showParkingFullWarning(vehicleType);
+    return;
   }
+
+  addRec(g.plate,now,null,'manual',{
+    note:reason,
+    reviewed:false,
+    vehicleType:vehicleType
+  });
+    }else{
+      const r=isInside(g.plate);
+      if(r)r.exit=now;
+      else addRec(g.plate,null,now,'manual',{
+        note:reason,
+        reviewed:false
+      });
+    }
+
+    g.phase='visitor';
+    logEvent(g.plate,'Manual: '+reason,g.dir);
+    openGate('manual');
+  }else{
+    addRec(g.plate,now,null,'denied',{
+      note:'Denied by guard',
+      reviewed:false
+    });
+
+    g.phase='denied';
+    logEvent(g.plate,'Denied',g.dir);
+  }
+
   render();
 }
+
 function resetGate(){const g=G();g.phase='idle';g.plate='';g.veh=null;g.conf=0;g.reason='';g.guess='';render()}
 
 /* ================= modals ================= */
@@ -483,7 +679,20 @@ function modalHTML(m){
     <form id="mform" novalidate>
      <div class="field"><label for="f-plate">Plate number *</label><input class="input mono${e.plate?' err':''}" id="f-plate" placeholder="e.g. ABC 1234" value="${esc(v.plate)}" autocomplete="off"${m.edit?' readonly':''}>${e.plate?`<span class="ferr">${e.plate}</span>`:`<span class="hint">3 letters followed by 3 or 4 digits in any order.</span>`}</div>
      <div class="field"><label for="f-owner">Owner *</label><select class="select${e.owner?' err':''}" id="f-owner"><option value="">Select owner</option>${state.users.map(x=>`<option value="${esc(x.id)}"${x.id===v.userId?' selected':''}>${esc(x.name)} (${esc(x.id)})</option>`).join('')}</select>${e.owner?`<span class="ferr">${e.owner}</span>`:`<span class="hint">Owner isn't listed? <button type="button" class="linkbtn" style="font-size:12px" data-act="add-user-from-vehicle">Add a user first</button></span>`}</div>
-     <div class="field"><label>Type</label><div class="readonly" id="f-type">${u?u.role:'Set from the owner'}</div></div>
+     <div class="field">
+  <label for="f-vehicle-type">Vehicle Category *</label>
+  <select class="select${e.vehicleType?' err':''}" id="f-vehicle-type">
+    <option value="">Select vehicle category</option>
+    <option value="Motorcycle"${v.vehicleType==='Motorcycle'?' selected':''}>Motorcycle</option>
+    <option value="FourWheeler"${v.vehicleType==='FourWheeler'?' selected':''}>Four-wheeler and above</option>
+  </select>
+  ${e.vehicleType?`<span class="ferr">${e.vehicleType}</span>`:''}
+</div>
+
+<div class="field">
+  <label>Owner role</label>
+  <div class="readonly" id="f-type">${u?u.role:'Set from the owner'}</div>
+</div>
      <div class="field"><label for="f-status">Status</label><select class="select" id="f-status"><option${v.status==='Active'?' selected':''}>Active</option><option${v.status==='Inactive'?' selected':''}>Inactive</option></select></div>
      <div class="foot"><button type="button" class="btn" data-act="close-modal">Cancel</button><button class="btn primary" type="submit">Save vehicle</button></div></form>`;
   }
@@ -513,15 +722,35 @@ const openModal=m=>{state.modal=m;renderModal()};
 const closeModal=()=>{state.modal=null;renderModal()};
 
 function saveVehicle(){
-  const m=state.modal,v={plate:$('#f-plate').value,userId:$('#f-owner').value,status:$('#f-status').value};const err={};
+  const m=state.modal,v={
+  plate:$('#f-plate').value,
+  userId:$('#f-owner').value,
+  status:$('#f-status').value,
+  vehicleType:$('#f-vehicle-type').value
+};
+const err={};
   const p=normPlate(v.plate);
   if(!v.plate.trim())err.plate='Enter the plate number.';
   else if(!p)err.plate='Enter a valid plate using 3 letters and 3 to 4 numbers.';
   else if(!m.edit&&state.vehicles.some(x=>x.plate===p))err.plate='This plate is already registered.';
   if(!v.userId)err.owner='Choose the vehicle owner.';
+  if(!v.vehicleType)err.vehicleType='Choose the vehicle category.';
   if(Object.keys(err).length){m.v={...v};m.err=err;renderModal();return}
-  if(m.edit){const t=state.vehicles.find(x=>x.plate===m.v.plate);t.userId=v.userId;t.status=v.status;toast('Vehicle updated')}
-  else{state.vehicles.push({plate:p,userId:v.userId,status:v.status});toast('Vehicle added')}
+  if(m.edit){
+  const t=state.vehicles.find(x=>x.plate===m.v.plate);
+  t.userId=v.userId;
+  t.status=v.status;
+  t.vehicleType=v.vehicleType;
+  toast('Vehicle updated');
+}else{
+  state.vehicles.push({
+    plate:p,
+    userId:v.userId,
+    status:v.status,
+    vehicleType:v.vehicleType
+  });
+  toast('Vehicle added');
+}
   closeModal();render();
 }
 function saveUser(){
@@ -562,11 +791,34 @@ document.addEventListener('click',e=>{
   else if(a==='forgot'){state.forgot=true;state.loginErr='';const u=$('#u').value,p=$('#p').value;render();$('#u').value=u;$('#p').value=p}
   else if(a==='goto-flagged'){state.rf={from:'',to:'',type:'all',status:'flagged',q:'',page:1};go('records')}
   /* vehicles */
-  else if(a==='add-vehicle')openModal({type:'vehicle',v:{plate:'',userId:'',status:'Active'},edit:false});
+  else if(a==='add-vehicle')openModal({
+  type:'vehicle',
+  v:{
+    plate:'',
+    userId:'',
+    status:'Active',
+    vehicleType:''
+  },
+  edit:false
+});
   else if(a==='edit-vehicle'){const v=state.vehicles.find(x=>x.plate===t.dataset.id);openModal({type:'vehicle',v:{...v},edit:true})}
   else if(a==='del-vehicle'){openModal({type:'confirm',kind:'vehicle',id:t.dataset.id,title:'Delete this vehicle?',text:`${t.dataset.id} will no longer be recognized at the gate. Past parking records stay.`,cta:'Delete vehicle'})}
   else if(a==='clear-v'){state.vq='';state.vtype='all';render()}
-  else if(a==='add-user-from-vehicle'){const vv={plate:$('#f-plate').value,userId:'',status:$('#f-status').value};openModal({type:'user',u:{id:'',name:'',role:'Student',status:'Active'},edit:false,returnToVehicle:vv})}
+  else if(a==='add-user-from-vehicle'){
+  const vv={
+    plate:$('#f-plate').value,
+    userId:'',
+    status:$('#f-status').value,
+    vehicleType:$('#f-vehicle-type').value
+  };
+
+  openModal({
+    type:'user',
+    u:{id:'',name:'',role:'Student',status:'Active'},
+    edit:false,
+    returnToVehicle:vv
+  });
+}
   /* users */
   else if(a==='add-user')openModal({type:'user',u:{id:'',name:'',role:'Student',status:'Active'},edit:false});
   else if(a==='edit-user'){const u=state.users.find(x=>x.id===t.dataset.id);openModal({type:'user',u:{...u},edit:true})}
@@ -587,7 +839,23 @@ document.addEventListener('click',e=>{
   /* gate */
   else if(a==='dir'){if(G().phase!=='scanning'){G().dir=t.dataset.d;resetGate()}}
   else if(a==='sim')simulate(t.dataset.k);
-  else if(a==='gate-open'){recordAuthorized(G().veh);G().logged=true;openGate('manual');render()}
+else if(a==='gate-open'){
+  const v=G().veh;
+  const vehicleType = v.vehicleType || ownerOf(v.plate).vehicleType;
+
+  if(G().dir==='entry' && isParkingFull(vehicleType)){    alert(
+    vehicleType==='Motorcycle'
+        ? 'MOTORCYCLE PARKING IS FULL!\n\nAll 50 motorcycle parking spaces are occupied. Please proceed to the admin office for assistance.'
+        : 'FOUR-WHEELER PARKING IS FULL!\n\nAll 20 four-wheeler parking spaces are occupied. Please proceed to the admin office for assistance.'
+    );
+    return;
+  }
+
+  recordAuthorized(v);
+  G().logged=true;
+  openGate('manual');
+  render();
+}
   else if(a==='gate-visitor')logManual('visitor');
   else if(a==='gate-deny')logManual('deny');
   else if(a==='gate-dismiss')resetGate();

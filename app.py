@@ -25,8 +25,10 @@ CREATE TABLE IF NOT EXISTS users (
   role TEXT NOT NULL CHECK (role IN ('Student','Faculty','Staff')),
   status TEXT NOT NULL CHECK (status IN ('Active','Inactive')));
 CREATE TABLE IF NOT EXISTS vehicles (
-  plate TEXT PRIMARY KEY, user_id TEXT NOT NULL,
-  status TEXT NOT NULL CHECK (status IN ('Active','Inactive')));
+  plate TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('Active','Inactive')),
+  vehicle_type TEXT NOT NULL DEFAULT 'Unclassified');
 CREATE TABLE IF NOT EXISTS records (
   id INTEGER PRIMARY KEY, plate TEXT NOT NULL, owner TEXT, type TEXT,
   entry TEXT, exit TEXT, result TEXT NOT NULL, note TEXT DEFAULT '', reviewed INTEGER DEFAULT 0);
@@ -52,17 +54,49 @@ def close_db(_exc):
         conn.close()
 
 
+
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     conn.executescript(SCHEMA)
+
+    # Check vehicles table
+    columns = [
+        row[1] for row in conn.execute("PRAGMA table_info(vehicles)")
+    ]
+
+    if "vehicle_type" not in columns:
+        conn.execute(
+            "ALTER TABLE vehicles ADD COLUMN vehicle_type TEXT NOT NULL DEFAULT 'Unclassified'"
+        )
+
+    # Check records table
+    record_columns = [
+        row[1] for row in conn.execute("PRAGMA table_info(records)")
+    ]
+
+    if "vehicle_type" not in record_columns:
+        conn.execute(
+            "ALTER TABLE records ADD COLUMN vehicle_type TEXT"
+        )
+
     if not conn.execute("SELECT 1 FROM admins").fetchone():
         pw = os.environ.get("ADMIN_PASSWORD", "parking2026")
-        conn.execute("INSERT INTO admins VALUES (?,?)", ("admin", generate_password_hash(pw)))
+        conn.execute(
+            "INSERT INTO admins VALUES (?,?)",
+            ("admin", generate_password_hash(pw))
+        )
         conn.executemany("INSERT INTO users VALUES (?,?,?,?)", SEED_USERS)
-        conn.executemany("INSERT INTO vehicles VALUES (?,?,?)", SEED_VEHICLES)
+        conn.executemany(
+            "INSERT INTO vehicles (plate, user_id, status) VALUES (?,?,?)",
+            SEED_VEHICLES
+        )
+
         import json
-        conn.executemany("INSERT INTO settings VALUES (?,?)",
-                         [(k, json.dumps(v)) for k, v in DEFAULT_SETTINGS.items()])
+        conn.executemany(
+            "INSERT INTO settings VALUES (?,?)",
+            [(k, json.dumps(v)) for k, v in DEFAULT_SETTINGS.items()]
+        )
+
     conn.commit()
     conn.close()
 
@@ -105,10 +139,23 @@ def get_state():
     c = db()
     return jsonify(
         users=[dict(r) for r in c.execute("SELECT id,name,role,status FROM users ORDER BY rowid")],
-        vehicles=[{"plate": r["plate"], "userId": r["user_id"], "status": r["status"]}
-                  for r in c.execute("SELECT * FROM vehicles ORDER BY rowid")],
-        records=[{**dict(r), "reviewed": bool(r["reviewed"])}
-                 for r in c.execute("SELECT * FROM records ORDER BY id")],
+        vehicles=[
+    {
+        "plate": r["plate"],
+        "userId": r["user_id"],
+        "status": r["status"],
+        "vehicleType": r["vehicle_type"]
+    }
+    for r in c.execute("SELECT * FROM vehicles ORDER BY rowid")
+],
+        records=[
+    {
+        **dict(r),
+        "vehicleType": r["vehicle_type"],
+        "reviewed": bool(r["reviewed"])
+    }
+    for r in c.execute("SELECT * FROM records ORDER BY id")
+],
         settings={r["key"]: json.loads(r["value"]) for r in c.execute("SELECT * FROM settings")},
     )
 
@@ -120,10 +167,30 @@ def put_state():
     d = request.get_json(silent=True) or {}
     try:
         users = [(u["id"], u["name"], u["role"], u["status"]) for u in d["users"]]
-        vehicles = [(v["plate"], v["userId"], v["status"]) for v in d["vehicles"]]
-        records = [(r["id"], r["plate"], r.get("owner"), r.get("type"), r.get("entry"),
-                    r.get("exit"), r["result"], r.get("note", ""), int(bool(r.get("reviewed"))))
-                   for r in d["records"]]
+        vehicles = [
+    (
+        v["plate"],
+        v["userId"],
+        v["status"],
+        v.get("vehicleType", "Unclassified")
+    )
+    for v in d["vehicles"]
+]
+        records = [
+    (
+        r["id"],
+        r["plate"],
+        r.get("owner"),
+        r.get("type"),
+        r.get("entry"),
+        r.get("exit"),
+        r["result"],
+        r.get("note", ""),
+        int(bool(r.get("reviewed"))),
+        r.get("vehicleType")
+    )
+    for r in d["records"]
+]
         settings = [(k, json.dumps(v)) for k, v in d["settings"].items()]
     except (KeyError, TypeError):
         return jsonify(error="Invalid data"), 400
@@ -133,8 +200,16 @@ def put_state():
             for t in ("users", "vehicles", "records", "settings"):
                 c.execute(f"DELETE FROM {t}")
             c.executemany("INSERT INTO users VALUES (?,?,?,?)", users)
-            c.executemany("INSERT INTO vehicles VALUES (?,?,?)", vehicles)
-            c.executemany("INSERT INTO records VALUES (?,?,?,?,?,?,?,?,?)", records)
+            c.executemany(
+    "INSERT INTO vehicles (plate, user_id, status, vehicle_type) VALUES (?,?,?,?)",
+    vehicles
+)
+            c.executemany(
+    """INSERT INTO records
+    (id, plate, owner, type, entry, exit, result, note, reviewed, vehicle_type)
+    VALUES (?,?,?,?,?,?,?,?,?,?)""",
+    records
+)
             c.executemany("INSERT INTO settings VALUES (?,?)", settings)
     except sqlite3.IntegrityError as e:
         return jsonify(error=str(e)), 400
