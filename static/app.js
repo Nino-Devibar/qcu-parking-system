@@ -502,8 +502,8 @@ let gateTimer=null,scanTimer=null;
 const G=()=>state.gate;
 function setBadges(){$$('[data-gatebadge]').forEach(el=>{const open=G().open;if(el.closest('.status'))el.innerHTML='<span class="dot"></span>Online, '+(open?'open':'closed');else{el.className='pill '+(open?'warn':'good');el.innerHTML=ic('barrier',16)+'Gate: '+(open?'open':'closed')}})}
 function openGate(mode){
-  const g=G();g.open=true;g.openMode=mode;clearTimeout(gateTimer);
-  gateTimer=setTimeout(()=>{g.open=false;if(state.page==='gate'&&state.auth){if(g.phase==='authorized'){g.phase='idle';g.plate='';g.veh=null;g.conf=0}render()}},state.settings.autoClose*1000);
+  const g=G();g.open=true;g.openMode=mode;clearTimeout(gateTimer);setLight('U');
+  gateTimer=setTimeout(()=>{g.open=false;setLight('D');if(state.page==='gate'&&state.auth){if(g.phase==='authorized'){g.phase='idle';g.plate='';g.veh=null;g.conf=0}render()}},state.settings.autoClose*1000);
 }
 function logEvent(plateStr,as,dir){G().event={t:new Date(),dir,as}}
 
@@ -641,7 +641,7 @@ function simulate(kind){
   g.phase='scanning';g.plate=plateStr;g.conf=conf;g.veh=null;g.reason='';
   render();clearTimeout(scanTimer);
   scanTimer=setTimeout(()=>{
-    if(conf<state.settings.threshold){g.phase='unclear';g.plate='';render()}
+    if(conf<state.settings.threshold){g.phase='unclear';g.plate='';setLight('Y');render()}
     else evaluate(plateStr,conf);
   },900);
 }
@@ -959,7 +959,7 @@ function onRead(d){
   if(cam.streak<2){setCamStatus('Reading '+d.plate+'…');return}
   cam.cool[d.plate]=now;cam.streak=0;cam.last=null;
   const g=G();g.kind='live';g.manualVal='';g.manualErr='';g.logged=false;g.event=null;
-  if(d.confidence<state.settings.threshold){g.phase='unclear';g.plate='';g.conf=d.confidence;g.guess=d.plate;render()}
+  if(d.confidence<state.settings.threshold){g.phase='unclear';g.plate='';g.conf=d.confidence;g.guess=d.plate;setLight('Y');render()}
   else evaluate(d.plate,d.confidence);
   if(cam.on)setCamStatus('Plate '+d.plate+' read.');
 }

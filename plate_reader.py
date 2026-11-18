@@ -1,6 +1,7 @@
 """Live license plate reading (EasyOCR). Format: 3 letters + 3 or 4 digits, e.g. NAB 1234."""
 import re
 import threading
+from plate_filter import pick_plate
 
 _reader = None
 _lock = threading.Lock()
@@ -80,7 +81,7 @@ def read_plate(img):
     h, w = img.shape[:2]
     with _lock:
         results = _reader.readtext(img, allowlist=ALLOW)
-    found = best_plate(results)
+    found = pick_plate(results)
     if not found:
         return {"found": False}
     plate, conf, (x0, y0, x1, y1) = found
